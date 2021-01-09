@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def start(update, context):
+    print("Started!")
     update.message.reply_text('Тебе вітає СБ')
     help(update, context)
 
