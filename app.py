@@ -76,7 +76,7 @@ def webhook():
         logger.info("Update received! " + update.message.text)
 
         update_queue.put(update)
-        dp.process_update(update)
+        #dp.process_update(update)
         return "OK"
     else:
         return "BAD"
