@@ -87,5 +87,6 @@ if __name__ == "__main__":
     bot = Bot(TELEGRAM_TOKEN)
     update_queue = Queue()
     dp = Dispatcher(bot, update_queue)
+    main()
     bot.setWebhook(f"https://testflasksbbot.herokuapp.com/{TELEGRAM_TOKEN}")
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), threaded=True)
