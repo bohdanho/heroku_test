@@ -1,9 +1,10 @@
 from flask import Flask, request
 import logging
 from telegram import Update, Bot, ReplyKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Dispatcher
 from threading import Thread
 import os
+from queue import Queue
 
 app = Flask(__name__)
 TELEGRAM_TOKEN = "1481681024:AAExedkDJ6Z1xkYVLIiszZsB-vOKKBjXlh4"
@@ -70,10 +71,11 @@ def main():
 def webhook():
     if request.method == "POST":
         # retrieve the message in JSON and then transform it to Telegram object
-        update = Update.de_json(request.get_json(force=True), bot=updater.bot)
+        update = Update.de_json(request.get_json(force=True), bot=bot)
         print(update)
         logger.info("Update received! " + update.message.text)
         dp.process_update(update)
+        update_queue.put(update)
         return "OK"
     else:
         return "BAD"
@@ -81,7 +83,8 @@ def webhook():
 
 if __name__ == "__main__":
     PORT = int(os.environ.get('PORT', '8443'))
-    updater = Updater(TELEGRAM_TOKEN)
-    updater.bot.setWebhook(f"https://testflasksbbot.herokuapp.com/{TELEGRAM_TOKEN}")
-    dp = updater.dispatcher
+    bot = Bot(TELEGRAM_TOKEN)
+    update_queue = Queue()
+    dp = Dispatcher(bot, update_queue)
+    bot.setWebhook(f"https://testflasksbbot.herokuapp.com/{TELEGRAM_TOKEN}")
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), threaded=True)
