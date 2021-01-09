@@ -74,8 +74,9 @@ def webhook():
         update = Update.de_json(request.get_json(force=True), bot=bot)
         print(update)
         logger.info("Update received! " + update.message.text)
-        dp.process_update(update)
+
         update_queue.put(update)
+        dp.process_update(update)
         return "OK"
     else:
         return "BAD"
