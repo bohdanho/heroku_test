@@ -168,7 +168,7 @@ def get_parsed_categories():
     record = cursor.fetchall()
     print(record)
     for row in record:  # Searching for all categories in every row
-        if row[3] not in parsed_categories:  # Checking if we do not have this category in our array
+        if row[3] and row[3] not in parsed_categories:  # Checking if we do not have this category in our array
             parsed_categories.append(row[3])
     return parsed_categories
 
