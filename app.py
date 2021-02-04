@@ -163,7 +163,7 @@ def error(update, context):
 
 # Receive all categories our songs currently have
 def get_parsed_categories():
-    cursor.execute("SELECT * from public.'Spivanik'")
+    cursor.execute('SELECT * FROM public."Spivanik"')
     parsed_categories = []
     record = cursor.fetchall()
     for row in record:  # Searching for all categories in every row
@@ -175,7 +175,7 @@ def get_parsed_categories():
 # Search for all songs of onr defined category
 def get_songs_for_category(category):
     songs = []
-    cursor.execute("SELECT * from public.'Spivanik'")
+    cursor.execute('SELECT * FROM public."Spivanik"')
     record = cursor.fetchall()
     for row in record:
         if row[3] == category:
@@ -186,7 +186,7 @@ def get_songs_for_category(category):
 # Music search in desired field. Passing the search key and the position in the SQL row/array
 def get_songs_for_search(key, position):
     songs = []
-    cursor.execute("SELECT * from public.'Spivanik'")
+    cursor.execute('SELECT * FROM public."Spivanik"')
     record = cursor.fetchall()
     for row in record:
         try:
