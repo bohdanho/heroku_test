@@ -20,13 +20,13 @@ logger = logging.getLogger(__name__)
 
 # /start
 def start(update, context):
-    update.message.reply_text('Тебе вітає СБ')
+    update.message.reply_text('Тебе вітає СБ!')
     help(update, context)
 
 
 # /about
 def about(update, context):
-    update.message.reply_text('Це бот для пошуку українських пісень')
+    update.message.reply_text('Це бот для пошуку українських пісень. Якщо маєш якість коментарі, то пиши @bohdanho')
 
 
 # /help
@@ -163,7 +163,7 @@ def error(update, context):
 
 # Receive all categories our songs currently have
 def get_parsed_categories():
-    cursor.execute("SELECT * from Songs")
+    cursor.execute("SELECT * from Spivanik")
     parsed_categories = []
     record = cursor.fetchall()
     for row in record:  # Searching for all categories in every row
@@ -175,7 +175,7 @@ def get_parsed_categories():
 # Search for all songs of onr defined category
 def get_songs_for_category(category):
     songs = []
-    cursor.execute("SELECT * from Songs")
+    cursor.execute("SELECT * from Spivanik")
     record = cursor.fetchall()
     for row in record:
         if row[3] == category:
@@ -186,7 +186,7 @@ def get_songs_for_category(category):
 # Music search in desired field. Passing the search key and the position in the SQL row/array
 def get_songs_for_search(key, position):
     songs = []
-    cursor.execute("SELECT * from Songs")
+    cursor.execute("SELECT * from Spivanik")
     record = cursor.fetchall()
     for row in record:
         try:
@@ -206,11 +206,11 @@ def send_songs(update, parsed_songs):
             # Чекаємо на наявність кожної характеристики в рядку
             if song[4]:
                 message_string += f"Текст:\n{song[4]}"
-            if song[5]:
+            if song[5] and "http" in song[5]:
                 inline_keyboard.append([InlineKeyboardButton(text="Аккорди", url=song[5])])
-            if song[6]:
+            if song[6] and "http" in song[6]:
                 inline_keyboard.append([InlineKeyboardButton(text="Таби", url=song[6])])
-            if song[7]:
+            if song[7] and "http" in song[7]:
                 inline_keyboard.append([InlineKeyboardButton(text="Кліп", url=song[7])])
             update.message.reply_text(message_string,
                                       reply_markup=InlineKeyboardMarkup(inline_keyboard))
@@ -272,8 +272,11 @@ if __name__ == '__main__':
     dp = Dispatcher(bot, update_queue)  # Creating the Dispatcher object
     launch_dispatcher()        # Preparing and launching the Dispatcher
     bot.setWebhook(f"https://testflasksbbot.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
-    connection = psycopg2.connect(
-        "postgres://akyuttvqhqxwkh:15c04c5d000cb821bd87df571aaecbd79ee96ad5ecb0509b57e1fbe7a9025dcf@ec2-54-220-229-215.eu-west-1.compute.amazonaws.com:5432/dblpl7cuuvkg9",
-        sslmode='require')  # Connecting to Heroku PostgresSQL
-    cursor = connection.cursor()  # Setting up the cursor
+    try:
+        #db_url = os.environ['DATABASE_URL']
+        db_url = "postgres://jsflplcerunvml:7ea5c96a2749879d490d341809f09614f2121eaf4f29ed98f39dda6e1ddb4841@ec2-54-78-45-84.eu-west-1.compute.amazonaws.com:5432/d4eopvjlccalgh"
+        connection = psycopg2.connect(db_url, sslmode='require')  # Connecting to Heroku PostgresSQL
+        cursor = connection.cursor()  # Setting up the cursor
+    except:
+        bot.send_message()
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), threaded=True)  # Launching the FLask app on appropriate IP and PORT
