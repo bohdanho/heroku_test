@@ -166,6 +166,7 @@ def get_parsed_categories():
     cursor.execute('SELECT * FROM public."Spivanik"')
     parsed_categories = []
     record = cursor.fetchall()
+    print(record)
     for row in record:  # Searching for all categories in every row
         if row[3] not in parsed_categories:  # Checking if we do not have this category in our array
             parsed_categories.append(row[3])
@@ -278,6 +279,5 @@ if __name__ == '__main__':
         connection = psycopg2.connect(db_url, sslmode='require')  # Connecting to Heroku PostgresSQL
         cursor = connection.cursor()  # Setting up the cursor
     except:
-        print(1)
         bot.send_message(chat_id=548999439, text="Problems with DB")
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), threaded=True)  # Launching the FLask app on appropriate IP and PORT
