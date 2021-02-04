@@ -278,5 +278,6 @@ if __name__ == '__main__':
         connection = psycopg2.connect(db_url, sslmode='require')  # Connecting to Heroku PostgresSQL
         cursor = connection.cursor()  # Setting up the cursor
     except:
-        bot.send_message()
+        print(1)
+        #bot.send_message()
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), threaded=True)  # Launching the FLask app on appropriate IP and PORT
