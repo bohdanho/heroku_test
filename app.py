@@ -42,7 +42,9 @@ def help(update, context):
 def spiv(update, context):
     reply_keyboard = [['Пошук пісні', 'Категорії'],
                       ['В головне меню']]
-    update.message.reply_text("Вибери метод пошуку: ", reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+    msg_id = update.message.reply_text("Вибери метод пошуку: ", reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))["message_id"]
+    chat_id = update.message["chat"]["id"]
+    update_msg_to_be_deleted(chat_id, msg_id)
 
 
 # Пошук пісні з першої клавіатури за різними методами
@@ -250,6 +252,7 @@ def delete_2_messages(update):
     chat_id = update["message"]["chat"]["id"]
     last_message_id = update["message"]["message_id"]
     try:
+        bot_message_id = update["message"]["message_id"] - 1
         for msg in messages_to_be_deleted:
             if msg["chat_id"] == chat_id:
                 bot_message_id = msg["last_msg_id"]
