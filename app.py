@@ -12,6 +12,7 @@ app = Flask(__name__)
 
 TELEGRAM_TOKEN = "1481681024:AAExedkDJ6Z1xkYVLIiszZsB-vOKKBjXlh4"  # Telegram token
 switch_array = []  # Special array for search methods (назва, виконавець, текст) [{"switch": "Назва методу пошуку", "chat_id": chat_id}, ...]
+messages_to_be_deleted = []  # [{"chat_id": chat_id, "last_msg_id": msg_id}, ...]
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -47,8 +48,10 @@ def spiv(update, context):
 # Пошук пісні з першої клавіатури за різними методами
 def music_search(update):
     music_search_keyboard = [['За назвою'], ['За виконавцем'], ['За текстом'], ['Назад до пошуку']]
-    update.message.reply_text("Вибери за чим проводити пошук: ",
-                              reply_markup=ReplyKeyboardMarkup(music_search_keyboard, one_time_keyboard=True))
+    msg_id = update.message.reply_text("Вибери за чим проводити пошук: ",
+                              reply_markup=ReplyKeyboardMarkup(music_search_keyboard, one_time_keyboard=True))["message_id"]
+    chat_id = update.message["chat"]["id"]
+    update_msg_to_be_deleted(chat_id, msg_id)
 
 
 # Категорії з першої клавіатури
@@ -58,18 +61,21 @@ def categories(update):
     for item in parsed_categories:
         categories_keyboard.append([item])
     categories_keyboard.append(['Назад до пошуку'])
-    update.message.reply_text("Вибери категорію: ",
-                              reply_markup=ReplyKeyboardMarkup(categories_keyboard, one_time_keyboard=True))
+    msg_id = update.message.reply_text("Вибери категорію: ",
+                              reply_markup=ReplyKeyboardMarkup(categories_keyboard, one_time_keyboard=True))["message_id"]
+    chat_id = update.message["chat"]["id"]
+    update_msg_to_be_deleted(chat_id, msg_id)
 
 
 # Non-command message
 def echo(update, context):
     global switch_array
-    parsed_categories = get_parsed_categories()  # Парсимо категорії для перевірки чи не є повідомлення із клаввіатури з категоріями
+    chat_id = update.message["chat"]["id"]
+    parsed_categories = get_parsed_categories()  # Парсимо категорії для перевірки чи не є повідомлення із клавіатури з категоріями
     if update.message.text == "В головне меню":
         # Про всяк випадок чистимо параметри пошуку юзера з switch_array, якщо він вирішив не шукати пісню і повернутись
         for item in switch_array:
-            if item["chat_id"] == update.message["chat"]["id"]:
+            if item["chat_id"] == chat_id:
                 del item
                 break
         delete_2_messages(update)
@@ -83,7 +89,7 @@ def echo(update, context):
         categories(update)
     # Поверталки
     elif update.message.text == 'Назад до пошуку':
-        delete_4_messages(update)
+        delete_2_messages(update)
         spiv(update, context)
     elif update.message.text == 'Назад до категорій':
         delete_2_messages(update)
@@ -91,7 +97,7 @@ def echo(update, context):
     elif update.message.text == 'Назад до методів пошуку':
         # Про всяк випадок чистимо параметри пошуку юзера з switch_array, якщо він вирішив не шукати пісню і повернутись
         for item in switch_array:
-            if item["chat_id"] == update.message["chat"]["id"]:
+            if item["chat_id"] == chat_id:
                 del item
                 break
         delete_2_messages(update)
@@ -101,40 +107,44 @@ def echo(update, context):
         delete_2_messages(update)
         parsed_songs = get_songs_for_category(update.message.text)
         send_songs(update, parsed_songs)
-        update.message.reply_text("Що далі? :)",
+        msg_id = update.message.reply_text("Що далі? :)",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до категорій"], ["В головне меню"]],
-                                                                   one_time_keyboard=True))
+                                                                   one_time_keyboard=True))["message_id"]
+        update_msg_to_be_deleted(chat_id, msg_id)
         del parsed_songs
     # Різні методи пошуку
     elif update.message.text == 'За назвою':
         delete_2_messages(update)
-        update.message.reply_text("Введи назву пісні: ",
-                                  reply_markup=ReplyKeyboardMarkup([["Назад до методів пошуку"], ["В головне меню"]], one_time_keyboard=True))
+        msg_id = update.message.reply_text("Введи назву пісні: ",
+                                  reply_markup=ReplyKeyboardMarkup([["Назад до методів пошуку"], ["В головне меню"]], one_time_keyboard=True))["message_id"]
+        update_msg_to_be_deleted(chat_id, msg_id)
         switch_array.append({
             "switch": 'Назва',
-            "chat_id": update.message["chat"]["id"]
+            "chat_id": chat_id
         })
     elif update.message.text == 'За виконавцем':
         delete_2_messages(update)
-        update.message.reply_text("Введи ім'я виконавця: ",
+        msg_id = update.message.reply_text("Введи ім'я виконавця: ",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до методів пошуку"], ["В головне меню"]],
-                                                                 one_time_keyboard=True))
+                                                                 one_time_keyboard=True))["message_id"]
+        update_msg_to_be_deleted(chat_id, msg_id)
         switch_array.append({
             "switch": "Виконавець",
-            "chat_id": update.message["chat"]["id"]
+            "chat_id": chat_id
         })
     elif update.message.text == 'За текстом':
         delete_2_messages(update)
-        update.message.reply_text("Введи частину тексту: ",
+        msg_id = update.message.reply_text("Введи частину тексту: ",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до методів пошуку"], ["В головне меню"]],
-                                                                   one_time_keyboard=True))
+                                                                   one_time_keyboard=True))["message_id"]
+        update_msg_to_be_deleted(chat_id, msg_id)
         switch_array.append({
             "switch": "Текст",
-            "chat_id": update.message["chat"]["id"]
+            "chat_id": chat_id
         })
-    elif (item["chat_id"] == update.message["chat"]["id"] for item in switch_array):
+    elif (item["chat_id"] == chat_id for item in switch_array):
         for item in switch_array:
-            if item["chat_id"] == update.message["chat"]["id"]:
+            if item["chat_id"] == chat_id:
                 parsed_songs = []
                 # Searching for songs in user-selected way with correlation to position in Songs table in DB
                 if item["switch"] == "Назва":
@@ -144,10 +154,11 @@ def echo(update, context):
                 elif item["switch"] == "Текст":
                     parsed_songs = get_songs_for_search(update.message.text, 4)
                 send_songs(update, parsed_songs)
-                update.message.reply_text("Що далі? :)",
+                msg_id = update.message.reply_text("Що далі? :)",
                                           reply_markup=ReplyKeyboardMarkup(
                                               [["Назад до методів пошуку"], ["В головне меню"]],
-                                              one_time_keyboard=True))
+                                              one_time_keyboard=True))["message_id"]
+                update_msg_to_be_deleted(chat_id, msg_id)
                 del item, parsed_songs  # Deleting used data to avoid overfilling the RAM
                 break
     else:  # Answer on every other message
@@ -166,7 +177,6 @@ def get_parsed_categories():
     cursor.execute('SELECT * FROM public."Spivanik"')
     parsed_categories = []
     record = cursor.fetchall()
-    print(record)
     for row in record:  # Searching for all categories in every row
         if row[3] and row[3] not in parsed_categories:  # Checking if we do not have this category in our array
             parsed_categories.append(row[3])
@@ -221,18 +231,45 @@ def send_songs(update, parsed_songs):
     del parsed_songs  # Deleting used data to avoid overfilling the RAM
 
 
+# Updating this array in order to delete appropriate messages in the future
+def update_msg_to_be_deleted(chat_id, msg_id):
+    global messages_to_be_deleted
+    checker = False
+    for msg in messages_to_be_deleted:
+        if msg["chat_id"] == chat_id:
+            msg["last_msg_id"] = msg_id
+            checker = True
+            break
+    if not checker:
+        messages_to_be_deleted.append({"chat_id": chat_id, "last_msg_id": msg_id})
+
+
 # Delete previous 2 messages after returning to the previous stage via custom keyboard
 def delete_2_messages(update):
+    global messages_to_be_deleted
     chat_id = update["message"]["chat"]["id"]
     last_message_id = update["message"]["message_id"]
-    for i in range(2):
-        requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={last_message_id-i}")
+    try:
+        for msg in messages_to_be_deleted:
+            if msg["chat_id"] == chat_id:
+                bot_message_id = msg["last_msg_id"]
+    except:
+        bot_message_id = update["message"]["message_id"] - 1
+    requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={last_message_id}")
+    requests.get(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={bot_message_id}")
 
 
 # Delete previous 4 messages after returning to the previous stage via custom keyboard
 def delete_4_messages(update):
+    global messages_to_be_deleted
     chat_id = update["message"]["chat"]["id"]
-    last_message_id = update["message"]["message_id"]
+    try:
+        for msg in messages_to_be_deleted:
+            if msg["chat_id"] == chat_id:
+                last_message_id = msg["last_msg_id"]
+    except:
+        last_message_id = update["message"]["message_id"]
     for i in range(4):
         requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={last_message_id-i}")
 
