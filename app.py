@@ -8,11 +8,34 @@ from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardBu
 from telegram.ext import CommandHandler, MessageHandler, Filters, Dispatcher
 import psycopg2
 
+
+class User:
+    def __init__(self, chat_id, username, text):
+        self.chat_id = chat_id
+        self.username = username
+        self.text = text
+        self.switch = None
+        self.last_msg = None
+
+    def change_text(self):
+        if self.text:
+            self.text = False
+        else:
+            self.text = True
+
+    def change_switch(self, switch):
+        self.switch = switch
+
+    def change_last_msg(self, msg_id):
+        self.last_msg = msg_id
+
+
 app = Flask(__name__)
 
-TELEGRAM_TOKEN = "1481681024:AAExedkDJ6Z1xkYVLIiszZsB-vOKKBjXlh4"  # Telegram token
+TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]  # Telegram token
 switch_array = []  # Special array for search methods (назва, виконавець, текст) [{"switch": "Назва методу пошуку", "chat_id": chat_id}, ...]
-messages_to_be_deleted = []  # [{"chat_id": chat_id, "last_msg_id": msg_id}, ...]
+messages_to_be_deleted = []  # Записуємо сюди останні повідомлення від бота до кожного chat_id [{"chat_id": chat_id, "last_msg_id": msg_id}, ...]
+users = []
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -22,7 +45,10 @@ logger = logging.getLogger(__name__)
 # /start
 def start(update, context):
     update.message.reply_text('Тебе вітає СБ!')
+    chat = update.message["chat"]
+    check_if_user_in_users(chat)
     help(update, context)
+    del chat
 
 
 # /about
@@ -36,6 +62,22 @@ def help(update, context):
                               '/help - Список доступних команд\n'
                               '/about - Дізнатись більше про СБ\n'
                               '/spiv - Пошук пісень')
+
+
+# /settings
+def settings(update, context):
+    chat_id = update.message["chat"]["id"]
+    user = find_user(chat_id)
+    if user.text:
+        reply_text = "У тебе ввімкнуте отримання текстів"
+        reply_keyboard = [["Вимкнути"],
+                          ["Назад"]]
+    else:
+        reply_text = "У тебе вимкнуте отримання текстів"
+        reply_keyboard = [["Ввімкнути"],
+                          ["Назад"]]
+    msg_id = update.message.reply_text(reply_text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))["message_id"]
+    update_msg_to_be_deleted(chat_id, msg_id)
 
 
 # /spiv
@@ -73,7 +115,12 @@ def categories(update):
 def echo(update, context):
     global switch_array
     chat_id = update.message["chat"]["id"]
+    user = find_user(chat_id)
     parsed_categories = get_parsed_categories()  # Парсимо категорії для перевірки чи не є повідомлення із клавіатури з категоріями
+    # Зміна налаштувань
+    if update.message.text == "Вимкнути" or update.message.text == "Ввімкнути":
+        user.change_text()
+        print(user.text)
     if update.message.text == "В головне меню":
         # Про всяк випадок чистимо параметри пошуку юзера з switch_array, якщо він вирішив не шукати пісню і повернутись
         for item in switch_array:
@@ -81,7 +128,7 @@ def echo(update, context):
                 del item
                 break
         delete_2_messages(update)
-        help(update, context)
+        #help(update, context)
     # Методи пошуку чи категорії
     elif update.message.text == "Пошук пісні":
         delete_2_messages(update)
@@ -90,6 +137,8 @@ def echo(update, context):
         delete_2_messages(update)
         categories(update)
     # Поверталки
+    elif update.message.text == 'Назад':
+        delete_2_messages(update)
     elif update.message.text == 'Назад до пошуку':
         delete_2_messages(update)
         spiv(update, context)
@@ -174,6 +223,23 @@ def error(update, context):
     logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 
+def check_if_user_in_users(chat):
+    global users
+    chat_id = chat["id"]
+    for user in users:
+        if user.chat_id == chat_id:
+            return 1
+    users.append(User(chat_id, chat["username"], True))
+
+
+def find_user(chat_id):
+    global users
+    for user in users:
+        if user.chat_id == chat_id:
+            return user
+
+
+
 # Receive all categories our songs currently have
 def get_parsed_categories():
     cursor.execute('SELECT * FROM public."Spivanik"')
@@ -220,11 +286,11 @@ def send_songs(update, parsed_songs):
             if song[4]:
                 message_string += f"Текст:\n{song[4]}"
             if song[5] and "http" in song[5]:
-                inline_keyboard.append([InlineKeyboardButton(text="Аккорди", url=song[5])])
+                inline_keyboard.append([InlineKeyboardButton(text="Аккорди 🎼", url=song[5])])
             if song[6] and "http" in song[6]:
-                inline_keyboard.append([InlineKeyboardButton(text="Таби", url=song[6])])
+                inline_keyboard.append([InlineKeyboardButton(text="Таби 🎶", url=song[6])])
             if song[7] and "http" in song[7]:
-                inline_keyboard.append([InlineKeyboardButton(text="Кліп", url=song[7])])
+                inline_keyboard.append([InlineKeyboardButton(text="Кліп 🎬", url=song[7])])
             update.message.reply_text(message_string,
                                       reply_markup=InlineKeyboardMarkup(inline_keyboard))
             del inline_keyboard, message_string  # Deleting used data to avoid overfilling the RAM
@@ -256,25 +322,12 @@ def delete_2_messages(update):
         for msg in messages_to_be_deleted:
             if msg["chat_id"] == chat_id:
                 bot_message_id = msg["last_msg_id"]
+                del msg
+                break
     except:
         bot_message_id = update["message"]["message_id"] - 1
     requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={last_message_id}")
-    requests.get(
-        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={bot_message_id}")
-
-
-# Delete previous 4 messages after returning to the previous stage via custom keyboard
-def delete_4_messages(update):
-    global messages_to_be_deleted
-    chat_id = update["message"]["chat"]["id"]
-    try:
-        for msg in messages_to_be_deleted:
-            if msg["chat_id"] == chat_id:
-                last_message_id = msg["last_msg_id"]
-    except:
-        last_message_id = update["message"]["message_id"]
-    for i in range(4):
-        requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={last_message_id-i}")
+    requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={bot_message_id}")
 
 
 # Receiving every update from telegram on webhook
@@ -312,7 +365,7 @@ if __name__ == '__main__':
     update_queue = Queue()     # Creating the queue for the Dispatcher
     dp = Dispatcher(bot, update_queue)  # Creating the Dispatcher object
     launch_dispatcher()        # Preparing and launching the Dispatcher
-    bot.setWebhook(f"https://testflasksbbot.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
+    bot.setWebhook(f"https://testflaskbot.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
     try:
         #db_url = os.environ['DATABASE_URL']
         db_url = "postgres://jsflplcerunvml:7ea5c96a2749879d490d341809f09614f2121eaf4f29ed98f39dda6e1ddb4841@ec2-54-78-45-84.eu-west-1.compute.amazonaws.com:5432/d4eopvjlccalgh"
@@ -320,4 +373,4 @@ if __name__ == '__main__':
         cursor = connection.cursor()  # Setting up the cursor
     except:
         bot.send_message(chat_id=548999439, text="Problems with DB")
-    app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), threaded=True)  # Launching the FLask app on appropriate IP and PORT
+    app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), threaded=True)  # Launching the Flask app on appropriate IP and PORT
