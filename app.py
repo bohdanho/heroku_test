@@ -80,7 +80,7 @@ def settings(update, context):
         reply_keyboard = [['Ввімкнути'],
                           ['Назад']]
     msg_id = update.message.reply_text(reply_text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))["message_id"]
-    update_msg_to_be_deleted(chat_id, msg_id)
+    user.last_msg = msg_id
 
 
 # /spiv
@@ -91,20 +91,19 @@ def spiv(update, context):
     chat_id = update.message["chat"]["id"]
     user = find_user(chat_id)
     user.searching = False
-    update_msg_to_be_deleted(chat_id, msg_id)
+    user.last_msg = msg_id
 
 
 # Пошук пісні з першої клавіатури за різними методами
-def music_search(update):
+def music_search(update, user):
     music_search_keyboard = [['За назвою'], ['За виконавцем'], ['За текстом'], ['Назад до пошуку']]
     msg_id = update.message.reply_text("Вибери за чим проводити пошук: ",
                               reply_markup=ReplyKeyboardMarkup(music_search_keyboard, one_time_keyboard=True))["message_id"]
-    chat_id = update.message["chat"]["id"]
-    update_msg_to_be_deleted(chat_id, msg_id)
+    user.last_msg = msg_id
 
 
 # Категорії з першої клавіатури
-def categories(update):
+def categories(update, user):
     parsed_categories = get_parsed_categories()
     categories_keyboard = []
     for item in parsed_categories:
@@ -112,8 +111,7 @@ def categories(update):
     categories_keyboard.append(['Назад до пошуку'])
     msg_id = update.message.reply_text("Вибери категорію: ",
                               reply_markup=ReplyKeyboardMarkup(categories_keyboard, one_time_keyboard=True))["message_id"]
-    chat_id = update.message["chat"]["id"]
-    update_msg_to_be_deleted(chat_id, msg_id)
+    user.last_msg = msg_id
 
 
 # Non-command message
@@ -124,64 +122,64 @@ def echo(update, context):
     # Зміна налаштувань
     if update.message.text == "Вимкнути" or update.message.text == "Ввімкнути":
         user.change_text()
-        delete_2_messages(update)
+        delete_2_messages(update, user.last_msg)
     if update.message.text == "В головне меню":
         # Про всяк випадок чистимо параметри пошуку юзера з switch_array, якщо він вирішив не шукати пісню і повернутись
         user.searching = False
-        delete_2_messages(update)
+        delete_2_messages(update, user.last_msg)
     # Методи пошуку чи категорії
     elif update.message.text == "Пошук пісні":
-        delete_2_messages(update)
-        music_search(update)
+        delete_2_messages(update, user.last_msg)
+        music_search(update, user)
     elif update.message.text == "Категорії":
-        delete_2_messages(update)
-        categories(update)
+        delete_2_messages(update, user.last_msg)
+        categories(update, user)
     # Поверталки
     elif update.message.text == 'Назад':
-        delete_2_messages(update)
+        delete_2_messages(update, user.last_msg)
     elif update.message.text == 'Назад до пошуку':
-        delete_2_messages(update)
+        delete_2_messages(update, user.last_msg)
         spiv(update, context)
     elif update.message.text == 'Назад до категорій':
-        delete_2_messages(update)
-        categories(update)
+        delete_2_messages(update, user.last_msg)
+        categories(update, user)
     elif update.message.text == 'Назад до методів пошуку':
         # Про всяк випадок чистимо параметри пошуку юзера з switch_array, якщо він вирішив не шукати пісню і повернутись
         user.searching = False
-        delete_2_messages(update)
-        music_search(update)
+        delete_2_messages(update, user.last_msg)
+        music_search(update, user)
     # Пошук за категоріями
     elif update.message.text in parsed_categories:
-        delete_2_messages(update)
+        delete_2_messages(update, user.last_msg)
         parsed_songs = get_songs_for_category(update.message.text)
         send_songs(update, parsed_songs, user.text)
         msg_id = update.message.reply_text("Що далі? :)",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до категорій"], ["В головне меню"]],
                                                                    one_time_keyboard=True))["message_id"]
-        update_msg_to_be_deleted(chat_id, msg_id)
+        user.last_msg = msg_id
         del parsed_songs
     # Різні методи пошуку
     elif update.message.text == 'За назвою':
-        delete_2_messages(update)
+        delete_2_messages(update, user.last_msg)
         msg_id = update.message.reply_text("Введи назву пісні: ",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до методів пошуку"], ["В головне меню"]], one_time_keyboard=True))["message_id"]
-        update_msg_to_be_deleted(chat_id, msg_id)
+        user.last_msg = msg_id
         user.switch = 'Назва'
         user.searching = True
     elif update.message.text == 'За виконавцем':
-        delete_2_messages(update)
+        delete_2_messages(update, user.last_msg)
         msg_id = update.message.reply_text("Введи ім'я виконавця: ",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до методів пошуку"], ["В головне меню"]],
                                                                  one_time_keyboard=True))["message_id"]
-        update_msg_to_be_deleted(chat_id, msg_id)
+        user.last_msg = msg_id
         user.switch = 'Виконавець'
         user.searching = True
     elif update.message.text == 'За текстом':
-        delete_2_messages(update)
+        delete_2_messages(update, user.last_msg)
         msg_id = update.message.reply_text("Введи частину тексту: ",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до методів пошуку"], ["В головне меню"]],
                                                                    one_time_keyboard=True))["message_id"]
-        update_msg_to_be_deleted(chat_id, msg_id)
+        user.last_msg = msg_id
         user.switch = 'Текст'
         user.searching = True
     elif user.searching:
@@ -197,7 +195,8 @@ def echo(update, context):
         msg_id = update.message.reply_text("Що далі? :)", reply_markup=ReplyKeyboardMarkup(
                                       [["Назад до методів пошуку"], ["В головне меню"]],
                                       one_time_keyboard=True))["message_id"]
-        update_msg_to_be_deleted(chat_id, msg_id)
+        user.last_msg = msg_id
+        user.searching = False
         del parsed_songs  # Deleting used data to avoid overfilling the RAM
     else:  # Answer on every other message
         print(update)
@@ -286,32 +285,13 @@ def send_songs(update, parsed_songs, text=None):
     del parsed_songs  # Deleting used data to avoid overfilling the RAM
 
 
-# Updating this array in order to delete appropriate messages in the future
-def update_msg_to_be_deleted(chat_id, msg_id):
-    global messages_to_be_deleted
-    checker = False
-    for msg in messages_to_be_deleted:
-        if msg["chat_id"] == chat_id:
-            msg["last_msg_id"] = msg_id
-            checker = True
-            break
-    if not checker:
-        messages_to_be_deleted.append({"chat_id": chat_id, "last_msg_id": msg_id})
-
-
 # Delete previous 2 messages after returning to the previous stage via custom keyboard
-def delete_2_messages(update):
-    global messages_to_be_deleted
+def delete_2_messages(update, bot_message_id=None):
     chat_id = update["message"]["chat"]["id"]
     last_message_id = update["message"]["message_id"]
-    try:
-        bot_message_id = update["message"]["message_id"] - 1
-        for msg in messages_to_be_deleted:
-            if msg["chat_id"] == chat_id:
-                bot_message_id = msg["last_msg_id"]
-                del msg
-                break
-    except:
+    if bot_message_id:
+        pass
+    else:
         bot_message_id = update["message"]["message_id"] - 1
     requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={last_message_id}")
     requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={bot_message_id}")
