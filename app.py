@@ -61,6 +61,7 @@ def help(update, context):
     update.message.reply_text('Вибирай потрібну команду:\n'
                               '/help - Список доступних команд\n'
                               '/about - Дізнатись більше про СБ\n'
+                              '/settings - Змінити налаштування\n'
                               '/spiv - Пошук пісень')
 
 
@@ -70,12 +71,12 @@ def settings(update, context):
     user = find_user(chat_id)
     if user.text:
         reply_text = "У тебе ввімкнуте отримання текстів"
-        reply_keyboard = [["Вимкнути"],
-                          ["Назад"]]
+        reply_keyboard = [['Вимкнути'],
+                          ['Назад']]
     else:
         reply_text = "У тебе вимкнуте отримання текстів"
-        reply_keyboard = [["Ввімкнути"],
-                          ["Назад"]]
+        reply_keyboard = [['Ввімкнути'],
+                          ['Назад']]
     msg_id = update.message.reply_text(reply_text, reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))["message_id"]
     update_msg_to_be_deleted(chat_id, msg_id)
 
@@ -120,7 +121,7 @@ def echo(update, context):
     # Зміна налаштувань
     if update.message.text == "Вимкнути" or update.message.text == "Ввімкнути":
         user.change_text()
-        print(user.text)
+        delete_2_messages(update)
     if update.message.text == "В головне меню":
         # Про всяк випадок чистимо параметри пошуку юзера з switch_array, якщо він вирішив не шукати пісню і повернутись
         for item in switch_array:
@@ -128,7 +129,6 @@ def echo(update, context):
                 del item
                 break
         delete_2_messages(update)
-        #help(update, context)
     # Методи пошуку чи категорії
     elif update.message.text == "Пошук пісні":
         delete_2_messages(update)
@@ -157,7 +157,7 @@ def echo(update, context):
     elif update.message.text in parsed_categories:
         delete_2_messages(update)
         parsed_songs = get_songs_for_category(update.message.text)
-        send_songs(update, parsed_songs)
+        send_songs(update, parsed_songs, user.text)
         msg_id = update.message.reply_text("Що далі? :)",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до категорій"], ["В головне меню"]],
                                                                    one_time_keyboard=True))["message_id"]
@@ -204,7 +204,7 @@ def echo(update, context):
                     parsed_songs = get_songs_for_search(update.message.text, 2)
                 elif item["switch"] == "Текст":
                     parsed_songs = get_songs_for_search(update.message.text, 4)
-                send_songs(update, parsed_songs)
+                send_songs(update, parsed_songs, user.text)
                 msg_id = update.message.reply_text("Що далі? :)",
                                           reply_markup=ReplyKeyboardMarkup(
                                               [["Назад до методів пошуку"], ["В головне меню"]],
@@ -277,13 +277,13 @@ def get_songs_for_search(key, position):
 
 
 # Компонуємо та відправляємо повідомлення з піснями, які ми витягнули з ДБ, вставлямо весь наявний контент
-def send_songs(update, parsed_songs):
+def send_songs(update, parsed_songs, text=None):
     if parsed_songs:
         for song in parsed_songs:
             inline_keyboard = []
             message_string = f'"{song[1].upper()}"\nВиконавець: {song[2]}\nЖанр: {song[3]}\n'
             # Чекаємо на наявність кожної характеристики в рядку
-            if song[4]:
+            if song[4] and text:
                 message_string += f"Текст:\n{song[4]}"
             if song[5] and "http" in song[5]:
                 inline_keyboard.append([InlineKeyboardButton(text="Аккорди 🎼", url=song[5])])
@@ -366,7 +366,7 @@ if __name__ == '__main__':
     update_queue = Queue()     # Creating the queue for the Dispatcher
     dp = Dispatcher(bot, update_queue)  # Creating the Dispatcher object
     launch_dispatcher()        # Preparing and launching the Dispatcher
-    bot.setWebhook(f"https://testflasksbbot.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
+    bot.setWebhook(f"https://testflasksbbot.herokuapp.com /{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
     try:
         #db_url = os.environ['DATABASE_URL']
         db_url = "postgres://jsflplcerunvml:7ea5c96a2749879d490d341809f09614f2121eaf4f29ed98f39dda6e1ddb4841@ec2-54-78-45-84.eu-west-1.compute.amazonaws.com:5432/d4eopvjlccalgh"
