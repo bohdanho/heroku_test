@@ -15,6 +15,7 @@ class User:
         self.username = username
         self.text = text
         self.switch = None
+        self.searching = False
         self.last_msg = None
 
     def change_text(self):
@@ -33,7 +34,7 @@ class User:
 app = Flask(__name__)
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]  # Telegram token
-switch_array = []  # Special array for search methods (назва, виконавець, текст) [{"switch": "Назва методу пошуку", "chat_id": chat_id}, ...]
+# Special array for search methods (назва, виконавець, текст) [{"switch": "Назва методу пошуку", "chat_id": chat_id}, ...]
 messages_to_be_deleted = []  # Записуємо сюди останні повідомлення від бота до кожного chat_id [{"chat_id": chat_id, "last_msg_id": msg_id}, ...]
 users = []
 
@@ -69,6 +70,7 @@ def help(update, context):
 def settings(update, context):
     chat_id = update.message["chat"]["id"]
     user = find_user(chat_id)
+    user.searching = False
     if user.text:
         reply_text = "У тебе ввімкнуте отримання текстів"
         reply_keyboard = [['Вимкнути'],
@@ -87,6 +89,8 @@ def spiv(update, context):
                       ['В головне меню']]
     msg_id = update.message.reply_text("Вибери метод пошуку: ", reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))["message_id"]
     chat_id = update.message["chat"]["id"]
+    user = find_user(chat_id)
+    user.searching = False
     update_msg_to_be_deleted(chat_id, msg_id)
 
 
@@ -114,7 +118,6 @@ def categories(update):
 
 # Non-command message
 def echo(update, context):
-    global switch_array
     chat_id = update.message["chat"]["id"]
     user = find_user(chat_id)
     parsed_categories = get_parsed_categories()  # Парсимо категорії для перевірки чи не є повідомлення із клавіатури з категоріями
@@ -124,10 +127,7 @@ def echo(update, context):
         delete_2_messages(update)
     if update.message.text == "В головне меню":
         # Про всяк випадок чистимо параметри пошуку юзера з switch_array, якщо він вирішив не шукати пісню і повернутись
-        for item in switch_array:
-            if item["chat_id"] == chat_id:
-                del item
-                break
+        user.searching = False
         delete_2_messages(update)
     # Методи пошуку чи категорії
     elif update.message.text == "Пошук пісні":
@@ -147,10 +147,7 @@ def echo(update, context):
         categories(update)
     elif update.message.text == 'Назад до методів пошуку':
         # Про всяк випадок чистимо параметри пошуку юзера з switch_array, якщо він вирішив не шукати пісню і повернутись
-        for item in switch_array:
-            if item["chat_id"] == chat_id:
-                del item
-                break
+        user.searching = False
         delete_2_messages(update)
         music_search(update)
     # Пошук за категоріями
@@ -169,49 +166,39 @@ def echo(update, context):
         msg_id = update.message.reply_text("Введи назву пісні: ",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до методів пошуку"], ["В головне меню"]], one_time_keyboard=True))["message_id"]
         update_msg_to_be_deleted(chat_id, msg_id)
-        switch_array.append({
-            "switch": 'Назва',
-            "chat_id": chat_id
-        })
+        user.switch = 'Назва'
+        user.searching = True
     elif update.message.text == 'За виконавцем':
         delete_2_messages(update)
         msg_id = update.message.reply_text("Введи ім'я виконавця: ",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до методів пошуку"], ["В головне меню"]],
                                                                  one_time_keyboard=True))["message_id"]
         update_msg_to_be_deleted(chat_id, msg_id)
-        switch_array.append({
-            "switch": "Виконавець",
-            "chat_id": chat_id
-        })
+        user.switch = 'Виконавець'
+        user.searching = True
     elif update.message.text == 'За текстом':
         delete_2_messages(update)
         msg_id = update.message.reply_text("Введи частину тексту: ",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до методів пошуку"], ["В головне меню"]],
                                                                    one_time_keyboard=True))["message_id"]
         update_msg_to_be_deleted(chat_id, msg_id)
-        switch_array.append({
-            "switch": "Текст",
-            "chat_id": chat_id
-        })
-    elif (item["chat_id"] == chat_id for item in switch_array):
-        for item in switch_array:
-            if item["chat_id"] == chat_id:
-                parsed_songs = []
-                # Searching for songs in user-selected way with correlation to position in Songs table in DB
-                if item["switch"] == "Назва":
-                    parsed_songs = get_songs_for_search(update.message.text, 1)
-                elif item["switch"] == "Виконавець":
-                    parsed_songs = get_songs_for_search(update.message.text, 2)
-                elif item["switch"] == "Текст":
-                    parsed_songs = get_songs_for_search(update.message.text, 4)
-                send_songs(update, parsed_songs, user.text)
-                msg_id = update.message.reply_text("Що далі? :)",
-                                          reply_markup=ReplyKeyboardMarkup(
-                                              [["Назад до методів пошуку"], ["В головне меню"]],
-                                              one_time_keyboard=True))["message_id"]
-                update_msg_to_be_deleted(chat_id, msg_id)
-                del item, parsed_songs  # Deleting used data to avoid overfilling the RAM
-                break
+        user.switch = 'Текст'
+        user.searching = True
+    elif user.searching:
+        parsed_songs = []
+        # Searching for songs in user-selected way with correlation to position in Songs table in DB
+        if user.switch == "Назва":
+            parsed_songs = get_songs_for_search(update.message.text, 1)
+        elif user.switch == "Виконавець":
+            parsed_songs = get_songs_for_search(update.message.text, 2)
+        elif user.switch == "Текст":
+            parsed_songs = get_songs_for_search(update.message.text, 4)
+        send_songs(update, parsed_songs, user.text)
+        msg_id = update.message.reply_text("Що далі? :)", reply_markup=ReplyKeyboardMarkup(
+                                      [["Назад до методів пошуку"], ["В головне меню"]],
+                                      one_time_keyboard=True))["message_id"]
+        update_msg_to_be_deleted(chat_id, msg_id)
+        del parsed_songs  # Deleting used data to avoid overfilling the RAM
     else:  # Answer on every other message
         print(update)
         update.message.reply_text("Дякую, що написав, " + update['message']['chat']['first_name'] + ", ми обов'язково подумаємо над цим")
