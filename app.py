@@ -24,18 +24,10 @@ class User:
         else:
             self.text = True
 
-    def change_switch(self, switch):
-        self.switch = switch
-
-    def change_last_msg(self, msg_id):
-        self.last_msg = msg_id
-
 
 app = Flask(__name__)
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]  # Telegram token
-# Special array for search methods (назва, виконавець, текст) [{"switch": "Назва методу пошуку", "chat_id": chat_id}, ...]
-messages_to_be_deleted = []  # Записуємо сюди останні повідомлення від бота до кожного chat_id [{"chat_id": chat_id, "last_msg_id": msg_id}, ...]
 users = []
 
 # Enable logging
@@ -45,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 # /start
 def start(update, context):
-    update.message.reply_text('Тебе вітає СБ!')
+    update.message.reply_text('Тебе вітає СБ!💙💛')
     chat = update.message["chat"]
     check_if_user_in_users(chat)
     help(update, context)
@@ -123,7 +115,7 @@ def echo(update, context):
     if update.message.text == "Вимкнути" or update.message.text == "Ввімкнути":
         user.change_text()
         delete_2_messages(update, user.last_msg)
-    if update.message.text == "В головне меню":
+    elif update.message.text == "В головне меню":
         # Про всяк випадок чистимо параметри пошуку юзера з switch_array, якщо він вирішив не шукати пісню і повернутись
         user.searching = False
         delete_2_messages(update, user.last_msg)
@@ -225,7 +217,6 @@ def find_user(chat_id):
             return user
 
 
-
 # Receive all categories our songs currently have
 def get_parsed_categories():
     cursor.execute('SELECT * FROM public."Spivanik"')
@@ -267,10 +258,10 @@ def send_songs(update, parsed_songs, text=None):
     if parsed_songs:
         for song in parsed_songs:
             inline_keyboard = []
-            message_string = f'"{song[1].upper()}"\nВиконавець: {song[2]}\nЖанр: {song[3]}\n'
+            message_string = f'"📛 {song[1].upper()}"\n🎤 Виконавець: {song[2]}\n🎵 Жанр: {song[3]}\n'
             # Чекаємо на наявність кожної характеристики в рядку
             if song[4] and text:
-                message_string += f"Текст:\n{song[4]}"
+                message_string += f"📜 Текст:\n{song[4]}"
             if song[5] and "http" in song[5]:
                 inline_keyboard.append([InlineKeyboardButton(text="Аккорди 🎼", url=song[5])])
             if song[6] and "http" in song[6]:
@@ -330,7 +321,7 @@ def launch_dispatcher():
 # Starting the application
 if __name__ == '__main__':
     bot = Bot(TELEGRAM_TOKEN)  # Creating the Bot object with TELEGRAM_TOKEN
-    update_queue = Queue()     # Creating the queue for the Dispatcher
+    update_queue = Queue()     # Creating the Queue for the Dispatcher
     dp = Dispatcher(bot, update_queue)  # Creating the Dispatcher object
     launch_dispatcher()        # Preparing and launching the Dispatcher
     bot.setWebhook(f"https://testflasksbbot.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
