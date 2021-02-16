@@ -365,7 +365,7 @@ if __name__ == '__main__':
     update_queue = Queue()     # Creating the queue for the Dispatcher
     dp = Dispatcher(bot, update_queue)  # Creating the Dispatcher object
     launch_dispatcher()        # Preparing and launching the Dispatcher
-    bot.setWebhook(f"https://testflaskbot.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
+    bot.setWebhook(f"https://testflasksbbot.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
     try:
         #db_url = os.environ['DATABASE_URL']
         db_url = "postgres://jsflplcerunvml:7ea5c96a2749879d490d341809f09614f2121eaf4f29ed98f39dda6e1ddb4841@ec2-54-78-45-84.eu-west-1.compute.amazonaws.com:5432/d4eopvjlccalgh"
