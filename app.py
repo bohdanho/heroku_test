@@ -350,6 +350,7 @@ def launch_dispatcher():
     dp.add_handler(CommandHandler("about", about))
     dp.add_handler(CommandHandler("help", help))
     dp.add_handler(CommandHandler("spiv", spiv))
+    dp.add_handler(CommandHandler("settings", settings))
     # On message
     dp.add_handler(MessageHandler(Filters.text, echo))
     # log all errors
