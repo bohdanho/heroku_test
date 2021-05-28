@@ -263,7 +263,7 @@ def send_songs(update, parsed_songs, text=None):
             print(3, message_string)
             # Чекаємо на наявність кожної характеристики в рядку
             if song['Текст'] and text:
-                message_string += f"📜 Текст:\n{song[4]}"
+                message_string += f"📜 Текст:\n{song['Текст']}"
                 print(4, message_string)
             if song['Акорди'] and "http" in song['Акорди']:
                 inline_keyboard.append([InlineKeyboardButton(text="Акорди 🎼", url=song['Акорди'])])
