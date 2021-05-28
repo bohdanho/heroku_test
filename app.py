@@ -254,19 +254,25 @@ def find_user(chat_id):
 
 # Компонуємо та відправляємо повідомлення з піснями, які ми витягнули з ДБ, вставлямо весь наявний контент
 def send_songs(update, parsed_songs, text=None):
+    print(1, parsed_songs)
     if parsed_songs:
         for song in parsed_songs:
+            print(2, song)
             inline_keyboard = []
             message_string = f'🏷 "{song["Назва"].upper()}"\n🎤 Виконавець: {song["Виконавець"]}\n💿 Жанр: {song["Категорії"]}\n'
+            print(3, message_string)
             # Чекаємо на наявність кожної характеристики в рядку
             if song['Текст'] and text:
                 message_string += f"📜 Текст:\n{song[4]}"
+                print(4, message_string)
             if song['Акорди'] and "http" in song['Акорди']:
                 inline_keyboard.append([InlineKeyboardButton(text="Акорди 🎼", url=song['Акорди'])])
+                print(5, message_string)
             if song['Кліп'] and "http" in song['Кліп']:
                 inline_keyboard.append([InlineKeyboardButton(text="Кліп 🎬", url=song['Кліп'])])
+                print(6, message_string)
             if song['Таби'] and "http" in song['Таби']:
-                print(message_string, song['Таби'])
+                print(7, message_string, song['Таби'])
                 # inline_keyboard.append([InlineKeyboardButton(text="Таби 🎶", url=song['Таби'])])
                 bot.send_photo(chat_id=update.message['chat']['id'], photo=song['Таби'], caption=message_string, reply_markup=InlineKeyboardMarkup(inline_keyboard))
             else:
