@@ -1,12 +1,14 @@
 import os
 import logging
 from queue import Queue
-from threading import Thread
+from threading import Thread, Timer
 import requests
 from flask import Flask, request
 from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, Bot, Update
 from telegram.ext import CommandHandler, MessageHandler, Filters, Dispatcher
-import psycopg2
+import pygsheets
+import json
+import time
 
 
 class User:
@@ -23,6 +25,44 @@ class User:
             self.text = False
         else:
             self.text = True
+
+
+class GSheetsManager:
+    def __init__(self):
+        self.client = pygsheets.authorize(service_account_env_var='GOOGLE API')
+        self.sheet = self.client.open('Spivanik_songs').sheet1
+        self.data = self.sheet.get_all_records(empty_value='', head=1, majdim='ROWS', numericise_data=True)
+        self.timeout = 10.0
+        Timer(self.timeout, self.update_data).start()
+
+    def update_data(self):
+        self.data = self.sheet.get_all_records(empty_value='', head=1, majdim='ROWS', numericise_data=True)
+        Timer(self.timeout, self.update_data).start()
+
+    def get_parsed_categories(self):
+        parsed_categories = []
+        for row in self.data:
+            for category in row['Категорії'].split(';'):
+                if category not in parsed_categories:
+                    parsed_categories.append(category)
+        return parsed_categories
+
+    def get_songs_for_category(self, category):
+        songs = []
+        for row in self.data:
+            if category in row['Категорії']:
+                songs.append(row)
+        return songs
+
+    def get_songs_for_search(self, key, position):
+        songs = []
+        for row in self.data:
+            try:
+                if key.lower() in row[position].lower():
+                    songs.append(row)
+            except AttributeError:  # Якщо раптом нема тексту у пісні, то не вийде пошукати
+                print("Нема тексту")
+        return songs
 
 
 app = Flask(__name__)
@@ -96,7 +136,7 @@ def music_search(update, user):
 
 # Категорії з першої клавіатури
 def categories(update, user):
-    parsed_categories = get_parsed_categories()
+    parsed_categories = gsheets_manager.get_parsed_categories()
     categories_keyboard = []
     for item in parsed_categories:
         categories_keyboard.append([item])
@@ -110,7 +150,7 @@ def categories(update, user):
 def echo(update, context):
     chat_id = update.message["chat"]["id"]
     user = find_user(chat_id)
-    parsed_categories = get_parsed_categories()  # Парсимо категорії для перевірки чи не є повідомлення із клавіатури з категоріями
+    parsed_categories = gsheets_manager.get_parsed_categories()  # Парсимо категорії для перевірки чи не є повідомлення із клавіатури з категоріями
     # Зміна налаштувань
     if update.message.text == "Вимкнути" or update.message.text == "Ввімкнути":
         user.change_text()
@@ -143,7 +183,7 @@ def echo(update, context):
     # Пошук за категоріями
     elif update.message.text in parsed_categories:
         delete_2_messages(update, user.last_msg)
-        parsed_songs = get_songs_for_category(update.message.text)
+        parsed_songs = gsheets_manager.get_songs_for_category(update.message.text)
         send_songs(update, parsed_songs, user.text)
         msg_id = update.message.reply_text("Що далі? :)",
                                   reply_markup=ReplyKeyboardMarkup([["Назад до категорій"], ["В головне меню"]],
@@ -175,14 +215,8 @@ def echo(update, context):
         user.switch = 'Текст'
         user.searching = True
     elif user.searching:
-        parsed_songs = []
         # Searching for songs in user-selected way with correlation to position in Songs table in DB
-        if user.switch == "Назва":
-            parsed_songs = get_songs_for_search(update.message.text, 1)
-        elif user.switch == "Виконавець":
-            parsed_songs = get_songs_for_search(update.message.text, 2)
-        elif user.switch == "Текст":
-            parsed_songs = get_songs_for_search(update.message.text, 4)
+        parsed_songs = gsheets_manager.get_songs_for_search(update.message.text, user.switch)
         send_songs(update, parsed_songs, user.text)
         msg_id = update.message.reply_text("Що далі? :)", reply_markup=ReplyKeyboardMarkup(
                                       [["Назад до методів пошуку"], ["В головне меню"]],
@@ -217,59 +251,24 @@ def find_user(chat_id):
             return user
 
 
-# Receive all categories our songs currently have
-def get_parsed_categories():
-    cursor.execute('SELECT * FROM public."Spivanik"')
-    parsed_categories = []
-    record = cursor.fetchall()
-    for row in record:  # Searching for all categories in every row
-        if row[3] and row[3] not in parsed_categories:  # Checking if we do not have this category in our array
-            parsed_categories.append(row[3])
-    return parsed_categories
-
-
-# Search for all songs of onr defined category
-def get_songs_for_category(category):
-    songs = []
-    cursor.execute('SELECT * FROM public."Spivanik"')
-    record = cursor.fetchall()
-    for row in record:
-        if row[3] == category:
-            songs.append(row)
-    return songs
-
-
-# Music search in desired field. Passing the search key and the position in the SQL row/array
-def get_songs_for_search(key, position):
-    songs = []
-    cursor.execute('SELECT * FROM public."Spivanik"')
-    record = cursor.fetchall()
-    for row in record:
-        try:
-            if key.lower() in row[position].lower():
-                songs.append(row)
-        except AttributeError:  # Якщо раптом нема тексту у пісні, то не вийде пошукати
-            print("Нема тексту")
-    return songs
-
-
 # Компонуємо та відправляємо повідомлення з піснями, які ми витягнули з ДБ, вставлямо весь наявний контент
 def send_songs(update, parsed_songs, text=None):
     if parsed_songs:
         for song in parsed_songs:
             inline_keyboard = []
-            message_string = f'"📛 {song[1].upper()}"\n🎤 Виконавець: {song[2]}\n🎵 Жанр: {song[3]}\n'
+            message_string = f'🏷 "{song["Назва"].upper()}"\n🎤 Виконавець: {song["Виконавець"]}\n💿 Жанр: {song["Категорії"]}\n'
             # Чекаємо на наявність кожної характеристики в рядку
-            if song[4] and text:
+            if song['Текст'] and text:
                 message_string += f"📜 Текст:\n{song[4]}"
-            if song[5] and "http" in song[5]:
-                inline_keyboard.append([InlineKeyboardButton(text="Аккорди 🎼", url=song[5])])
-            if song[6] and "http" in song[6]:
-                inline_keyboard.append([InlineKeyboardButton(text="Таби 🎶", url=song[6])])
-            if song[7] and "http" in song[7]:
-                inline_keyboard.append([InlineKeyboardButton(text="Кліп 🎬", url=song[7])])
-            update.message.reply_text(message_string,
-                                      reply_markup=InlineKeyboardMarkup(inline_keyboard))
+            if song['Акорди'] and "http" in song['Акорди']:
+                inline_keyboard.append([InlineKeyboardButton(text="Акорди 🎼", url=song['Акорди'])])
+            if song['Кліп'] and "http" in song['Кліп']:
+                inline_keyboard.append([InlineKeyboardButton(text="Кліп 🎬", url=song['Кліп'])])
+            if song['Таби'] and "http" in song['Таби']:
+                # inline_keyboard.append([InlineKeyboardButton(text="Таби 🎶", url=song['Таби'])])
+                bot.send_photo(chat_id=update.message['chat']['id'], photo=song['Таби'], caption=message_string, reply_markup=InlineKeyboardMarkup(inline_keyboard))
+            else:
+                update.message.reply_text(message_string, reply_markup=InlineKeyboardMarkup(inline_keyboard))
             del inline_keyboard, message_string  # Deleting used data to avoid overfilling the RAM
     else:
         update.message.reply_text("Нічого не знайдено :(")
@@ -286,6 +285,15 @@ def delete_2_messages(update, bot_message_id=None):
         bot_message_id = update["message"]["message_id"] - 1
     requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={last_message_id}")
     requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage?chat_id={chat_id}&message_id={bot_message_id}")
+
+
+@app.route('/send_message', methods=['GET', 'POST'])
+def send_message():
+    if request.method == "POST":
+        message = json.loads(request.get_json(force=True))
+        for user in users:
+            bot.send_message(chat_id=user.chat_id, text=message["message"])
+            time.sleep(0.04)
 
 
 # Receiving every update from telegram on webhook
@@ -324,12 +332,7 @@ if __name__ == '__main__':
     update_queue = Queue()     # Creating the Queue for the Dispatcher
     dp = Dispatcher(bot, update_queue)  # Creating the Dispatcher object
     launch_dispatcher()        # Preparing and launching the Dispatcher
-    bot.setWebhook(f"https://testflasksbbot.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
-    try:
-        #db_url = os.environ['DATABASE_URL']
-        db_url = "postgres://jsflplcerunvml:7ea5c96a2749879d490d341809f09614f2121eaf4f29ed98f39dda6e1ddb4841@ec2-54-78-45-84.eu-west-1.compute.amazonaws.com:5432/d4eopvjlccalgh"
-        connection = psycopg2.connect(db_url, sslmode='require')  # Connecting to Heroku PostgresSQL
-        cursor = connection.cursor()  # Setting up the cursor
-    except:
-        bot.send_message(chat_id=548999439, text="Problems with DB")
+    bot.deleteWebhook(drop_pending_updates=True)
+    bot.setWebhook(f"https://sbbotapp.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
+    gsheets_manager = GSheetsManager()
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), threaded=True)  # Launching the Flask app on appropriate IP and PORT
