@@ -333,6 +333,7 @@ if __name__ == '__main__':
     dp = Dispatcher(bot, update_queue)  # Creating the Dispatcher object
     launch_dispatcher()        # Preparing and launching the Dispatcher
     bot.deleteWebhook(drop_pending_updates=True)
-    bot.setWebhook(f"https://sbbotapp.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
+    #bot.setWebhook(f"https://sbbotapp.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
+    bot.setWebhook(f"https://testflasksbbot.herokuapp.com/{TELEGRAM_TOKEN}")  # Setting the WebHook for bot to receive updates
     gsheets_manager = GSheetsManager()
     app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), threaded=True)  # Launching the Flask app on appropriate IP and PORT
