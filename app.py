@@ -48,11 +48,11 @@ class GSheetsManager:
         return parsed_categories
 
     def get_songs_for_category(self, category):
-        print(4)
         songs = []
         for row in self.data:
             if category in row['Категорії']:
                 songs.append(row)
+        print(songs)
         return songs
 
     def get_songs_for_search(self, key, position):
@@ -183,7 +183,6 @@ def echo(update, context):
         music_search(update, user)
     # Пошук за категоріями
     elif update.message.text in parsed_categories:
-        print(1)
         delete_2_messages(update, user.last_msg)
         parsed_songs = gsheets_manager.get_songs_for_category(update.message.text)
         send_songs(update, parsed_songs, user.text)
@@ -255,7 +254,6 @@ def find_user(chat_id):
 
 # Компонуємо та відправляємо повідомлення з піснями, які ми витягнули з ДБ, вставлямо весь наявний контент
 def send_songs(update, parsed_songs, text=None):
-    print(3)
     if parsed_songs:
         for song in parsed_songs:
             inline_keyboard = []
@@ -268,6 +266,7 @@ def send_songs(update, parsed_songs, text=None):
             if song['Кліп'] and "http" in song['Кліп']:
                 inline_keyboard.append([InlineKeyboardButton(text="Кліп 🎬", url=song['Кліп'])])
             if song['Таби'] and "http" in song['Таби']:
+                print(message_string, song['Таби'])
                 # inline_keyboard.append([InlineKeyboardButton(text="Таби 🎶", url=song['Таби'])])
                 bot.send_photo(chat_id=update.message['chat']['id'], photo=song['Таби'], caption=message_string, reply_markup=InlineKeyboardMarkup(inline_keyboard))
             else:
@@ -280,7 +279,6 @@ def send_songs(update, parsed_songs, text=None):
 
 # Delete previous 2 messages after returning to the previous stage via custom keyboard
 def delete_2_messages(update, bot_message_id=None):
-    print(2)
     chat_id = update["message"]["chat"]["id"]
     last_message_id = update["message"]["message_id"]
     if bot_message_id:
