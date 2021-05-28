@@ -29,7 +29,7 @@ class User:
 
 class GSheetsManager:
     def __init__(self):
-        self.client = pygsheets.authorize(service_account_env_var='GOOGLE API')
+        self.client = pygsheets.authorize(service_account_env_var='GOOGLE_API')
         self.sheet = self.client.open('Spivanik_songs').sheet1
         self.data = self.sheet.get_all_records(empty_value='', head=1, majdim='ROWS', numericise_data=True)
         self.timeout = 10.0
